@@ -27,24 +27,48 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // Create context menu on install
 chrome.runtime.onInstalled.addListener(() => {
+	// Parent menu
 	chrome.contextMenus.create({
 		id: 'copyAsTanaPaste',
 		title: 'Copy as Tana Paste',
 		contexts: ['page', 'selection', 'image', 'link'],
 	});
+	// Submenu: include metadata
+	chrome.contextMenus.create({
+		id: 'copyAsTana_withMetadata',
+		parentId: 'copyAsTanaPaste',
+		title: 'Copy (with metadata)',
+		contexts: ['page', 'selection', 'image', 'link'],
+	});
+	// Submenu: selection only
+	chrome.contextMenus.create({
+		id: 'copyAsTana_selectionOnly',
+		parentId: 'copyAsTanaPaste',
+		title: 'Copy (selection only)',
+		contexts: ['selection'],
+	});
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-	if (info.menuItemId === 'copyAsTanaPaste' && tab && tab.id) runBuildOnTab(tab.id, info);
+	if (!tab || !tab.id) return;
+	// default: use the parent menu to include metadata (backwards compatible)
+	if (info.menuItemId === 'copyAsTanaPaste') return runBuildOnTab(tab.id, info);
+	if (info.menuItemId === 'copyAsTana_withMetadata') return runBuildOnTab(tab.id, { ...info, tanaOptionsOverride: { includeMetadata: true } });
+	if (info.menuItemId === 'copyAsTana_selectionOnly') return runBuildOnTab(tab.id, { ...info, tanaOptionsOverride: { includeMetadata: false } });
 });
 
 // Build Tana text in the page context and copy it there (so clipboard APIs work)
 function runBuildOnTab(tabId, info = {}) {
+	// info may include a `tanaOptionsOverride` object to override saved/default options for this run
 	chrome.scripting.executeScript(
 		{
 			target: { tabId },
-			func: (infoArg, opts) => {
+			func: (infoArg, opts, override) => {
 				// Page-scoped helpers
+				// Merge overrides into opts for this execution only (do not persist)
+				if (override && typeof override === 'object') {
+					opts = Object.assign({}, opts || {}, override || {});
+				}
 				function collectPage(info) {
 					const doc = document;
 					const title = doc.title || '';
@@ -294,7 +318,7 @@ function runBuildOnTab(tabId, info = {}) {
 
 				return toTana(collectPage(infoArg || {}), opts || {});
 			},
-			args: [info, options],
+			args: [info, options, info.tanaOptionsOverride || null],
 		},
 		(injectionResults) => {
 			try {
