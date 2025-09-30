@@ -217,11 +217,18 @@ function runBuildOnTab(tabId, info = {}) {
 									// drop duplicate of bold parent
 									if (boldParent && trimmed === `- **${boldParent}**`) continue;
 
+									// Filter out obvious boilerplate/section headings from articles
+									const stopRe = /^(share this post:?|click to share(?: on)?|related|posted in|tagged|posted on|share this|leave a comment|comments?)$/i;
+									if (stopRe.test(content)) continue;
+
 									// filter out lines that are actually metadata already (to avoid duplicates)
 									const lower = content.toLowerCase();
 									if (/^(publication::|date::|author::|source::)/.test(lower)) continue;
 									// filter out image lines like '![](url)'
 									if (content.startsWith('![](') || raw.includes('![](')) continue;
+
+									// filter out tiny stray lines or single punctuation
+									if (content === '.' || content.length < 2) continue;
 
 									childLines.push('  ' + raw);
 								}
@@ -247,20 +254,28 @@ function runBuildOnTab(tabId, info = {}) {
 									// If the source contains multiple dates concatenated, pick the first human-readable one
 									const extractFirstDate = (s) => {
 										if (!s) return '';
-										const str = String(s);
+										let str = String(s);
+										// Strip surrounding punctuation/brackets
+										str = str.replace(/^[\s\[\(<"'`\-–—]+/, '').replace(/[\s\]\)>"'`\-–—]+$/, '');
 										// Common long-form date like "July 22, 2025"
 										const longForm = str.match(/\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},\s+\d{4}\b/);
 										if (longForm && longForm[0]) return longForm[0].trim();
-										// ISO date like 2025-07-22 or with time
+										// ISO date like 2025-07-22
 										const iso = str.match(/\b\d{4}-\d{2}-\d{2}\b/);
 										if (iso && iso[0]) return iso[0];
 										// Fallback: collapse whitespace and trim, then if contains 'date:' strip that prefix and split on common separators
 										const cleaned = str.replace(/\s+/g, ' ').trim().replace(/^date:\s*/i, '');
-										// If there are multiple tokens separated without clear delimiters, pick the first reasonable chunk (up to 30 chars)
 										return cleaned.split(/\s{2,}|;|\||,/)[0].trim().slice(0, 80);
 									};
 
-									const finalDate = extractFirstDate(extractedDate || date || '');
+									let finalDate = extractFirstDate(extractedDate || date || '');
+									// strip stray brackets/punctuation and normalize
+									finalDate = finalDate.replace(/^[\s\[\(]+|[\]\)\s]+$/g, '').replace(/[\[\]]/g, '').trim();
+									// if there's no 4-digit year, try to derive one from the page URL
+									if (!/\d{4}/.test(finalDate) && url) {
+										const ym = String(url).match(/\/(20\d{2})(?:\/|$)/);
+										if (ym && ym[1]) finalDate = `${finalDate}${finalDate ? ', ' : ''}${ym[1]}`.trim();
+									}
 									if (opts.omitEmptyMetadata) {
 										if (finalDate) metaLines.push(`  - Date:: [[date:${finalDate}]]`);
 									} else {
