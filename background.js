@@ -204,7 +204,9 @@ function runBuildOnTab(tabId, info = {}) {
 
 					// Build metadata lines in requested order: Publication, Date, Author, Source, Image
 					const metaLines = [];
-					if (opts.includeMetadata) {
+					// Treat includeMetadata as true unless explicitly false
+					const includeMetadata = (typeof opts.includeMetadata === 'boolean') ? opts.includeMetadata : true;
+					if (includeMetadata) {
 						const pushIf = (label, value, allowEmpty) => {
 							if (allowEmpty) {
 								metaLines.push(`  - ${label}:: ${value || ''}`);
@@ -217,14 +219,27 @@ function runBuildOnTab(tabId, info = {}) {
 						if (opts.omitEmptyMetadata) pushIf('Publication', publication, false);
 						else pushIf('Publication', publication, true);
 
-									// Date: pick one clean date (prefer extracted from selection). Normalize whitespace
-									const normalizeDate = (s) => (s ? String(s).replace(/\s+/g, ' ').trim() : '');
-									const finalDateRaw = extractedDate ? extractedDate : date;
-									const finalDate = normalizeDate(finalDateRaw);
+									// Date: pick the first clean date (prefer extracted from selection).
+									// If the source contains multiple dates concatenated, pick the first human-readable one
+									const extractFirstDate = (s) => {
+										if (!s) return '';
+										const str = String(s);
+										// Common long-form date like "July 22, 2025"
+										const longForm = str.match(/\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},\s+\d{4}\b/);
+										if (longForm && longForm[0]) return longForm[0].trim();
+										// ISO date like 2025-07-22 or with time
+										const iso = str.match(/\b\d{4}-\d{2}-\d{2}\b/);
+										if (iso && iso[0]) return iso[0];
+										// Fallback: collapse whitespace and trim, then if contains 'date:' strip that prefix and split on common separators
+										const cleaned = str.replace(/\s+/g, ' ').trim().replace(/^date:\s*/i, '');
+										// If there are multiple tokens separated without clear delimiters, pick the first reasonable chunk (up to 30 chars)
+										return cleaned.split(/\s{2,}|;|\||,/)[0].trim().slice(0, 80);
+									};
+
+									const finalDate = extractFirstDate(extractedDate || date || '');
 									if (opts.omitEmptyMetadata) {
 										if (finalDate) metaLines.push(`  - Date:: [[date:${finalDate}]]`);
 									} else {
-										// emit even if empty
 										metaLines.push(`  - Date:: [[date:${finalDate || ''}]]`);
 									}
 
@@ -247,7 +262,23 @@ function runBuildOnTab(tabId, info = {}) {
 						}
 					}
 
-					// Emit metadata first
+					// If includeMetadata is true but no metadata was pushed (empty metaLines),
+					// use fallback metadata values (this guarantees fields appear under the parent)
+					if (includeMetadata && metaLines.length === 0) {
+						if (!opts.omitEmptyMetadata || (publication && String(publication).trim())) metaLines.push(`  - Publication:: ${publication}`);
+						const fallbackDate = (() => {
+							const d = extractFirstDate(extractedDate || date || '');
+							return d;
+						})();
+						if (!opts.omitEmptyMetadata || (fallbackDate && String(fallbackDate).trim())) {
+							metaLines.push(`  - Date:: [[date:${fallbackDate}]]`);
+						}
+						if (!opts.omitEmptyMetadata || (author && String(author).trim())) metaLines.push(`  - Author:: ${author}`);
+						if (!opts.omitEmptyMetadata || (url && String(url).trim())) { metaLines.push(`  - Source:: [${title || url}](${url || ''})`); addedSource = true; }
+						if (!opts.omitEmptyMetadata || (image && String(image).trim()) && !(selectionHtml && String(selectionHtml).includes(image))) metaLines.push(`  - ![](${image})`);
+					}
+
+					// Emit metadata first (so fields appear immediately under the parent)
 					lines.push(...metaLines);
 
 					// If there was no processed selection but there is a plain selection string, emit it
@@ -256,16 +287,6 @@ function runBuildOnTab(tabId, info = {}) {
 					} else {
 						// Append child lines (processed selection)
 						lines.push(...childLines);
-					}
-
-					// If metadata option is enabled, and we didn't already add some fields above, ensure
-					// we still include author/publication/date/image below parent if present and not already emitted.
-					// (This is a safety net for pages without extracted metadata)
-					if (opts.includeMetadata && metaLines.length === 0) {
-						if (author && (!opts.omitEmptyMetadata || String(author).trim())) lines.push(`  - Author:: ${author}`);
-						if (publication && (!opts.omitEmptyMetadata || String(publication).trim())) lines.push(`  - Publication:: ${publication}`);
-						if (date && (!opts.omitEmptyMetadata || String(date).trim())) lines.push(`  - Date:: [[date:${date}]]`);
-						if (image && (!opts.omitEmptyMetadata || String(image).trim()) && !(selectionHtml && String(selectionHtml).includes(image))) lines.push(`  - ![](${image})`);
 					}
 
 					return lines.join('\n');
