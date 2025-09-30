@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Tana Paste E2E Test Page</title>
+</head>
+<body>
+  <h1>Test article title</h1>
+  <p id="para">This is a sample paragraph to test selection. Select some of this text and right-click to use the extension's context menu.</p>
+  <p>Another paragraph with a <a href="https://example.com">link</a> and an image below.</p>
+  <img src="https://via.placeholder.com/150" alt="placeholder" />
+  <script>
+    // Helper so you can call window.getTanaFromPage() from the console if needed
+    window.getTanaFromPage = (info = {}) => {
+      // Minimal pageData collector (mirrors background injection)
+      function meta(name) {
+        const el = document.querySelector('meta[name="' + name + '"]') || document.querySelector('meta[property="' + name + '"]');
+        return el ? el.getAttribute('content') : undefined;
+      }
+      const pageData = {
+        title: document.title,
+        url: location.href,
+        author: meta('author'),
+        publication: meta('og:site_name'),
+        date: meta('article:published_time') || meta('date'),
+        image: (document.querySelector('meta[property="og:image"]') || {}).content,
+        selection: info.selectionText || null,
+        selectionHtml: null,
+        linkText: info.linkText || null,
+        linkUrl: info.linkUrl || null,
+      };
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const r = sel.getRangeAt(0);
+        const div = document.createElement('div');
+        div.appendChild(r.cloneContents());
+        pageData.selectionHtml = div.innerHTML;
+      }
+      // Simple formatting (mimics logic used in background.js)
+      const lines = ['%%tana%%'];
+      if (pageData.selection) {
+        if (pageData.selectionHtml) {
+          lines.push('- ' + pageData.selection);
+        } else {
+          lines.push('- ' + pageData.selection);
+        }
+      } else {
+        lines.push(`- [${pageData.title}](${pageData.url})`);
+      }
+      return lines.join('\n');
+    };
+  </script>
+</body>
+</html>

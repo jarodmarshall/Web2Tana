@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+  <html>
+  <!doctype html>
+  <html>
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width,initial-scale=1" />
+      <title>Tana Paste Options</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+        h1 { color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .option-group { margin-bottom: 16px; padding: 12px; background:#f9f9f9; border-radius:6px }
+        label { display:block; margin-bottom:8px }
+        input[type="text"] { width:240px; padding:6px }
+        button { padding:8px 12px; margin-top:10px }
+      </style>
+    </head>
+    <body>
+      <h1>Tana Paste — Options</h1>
+      <div class="option-group">
+        <label><input id="includeMetadata" type="checkbox"> Include page metadata (author, publication, date)</label>
+        <label><input id="omitEmptyMetadata" type="checkbox"> Hide empty metadata fields</label>
+        <label>Default tag: <input id="defaultTag" type="text" placeholder="e.g. webclip"></label>
+        <label><input id="notificationEnabled" type="checkbox"> Enable notifications</label>
+        <div>
+          <button id="save">Save</button>
+          <button id="reset">Reset to defaults</button>
+          <span id="status" style="margin-left:12px;color:green"></span>
+        </div>
+      </div>
+
+      <script>
+        const DEFAULT_OPTIONS = { includeMetadata: true, defaultTag: 'webclip', notificationEnabled: true, omitEmptyMetadata: true };
+        const el = id => document.getElementById(id);
+
+        function load() {
+          chrome.storage.sync.get(['tanaOptions'], (res) => {
+            const opts = (res && res.tanaOptions) ? res.tanaOptions : DEFAULT_OPTIONS;
+            el('includeMetadata').checked = !!opts.includeMetadata;
+            el('omitEmptyMetadata').checked = !!opts.omitEmptyMetadata;
+            el('defaultTag').value = opts.defaultTag || '';
+            el('notificationEnabled').checked = !!opts.notificationEnabled;
+          });
+        }
+
+        function save() {
+          const opts = {
+            includeMetadata: !!el('includeMetadata').checked,
+            omitEmptyMetadata: !!el('omitEmptyMetadata').checked,
+            defaultTag: (el('defaultTag').value || '').trim(),
+            notificationEnabled: !!el('notificationEnabled').checked,
+          };
+          chrome.storage.sync.set({ tanaOptions: opts }, () => {
+            const s = el('status'); s.textContent = 'Saved'; setTimeout(() => s.textContent = '', 1500);
+          });
+        }
+
+        function resetDefaults() {
+          el('includeMetadata').checked = DEFAULT_OPTIONS.includeMetadata;
+          el('omitEmptyMetadata').checked = DEFAULT_OPTIONS.omitEmptyMetadata;
+          el('defaultTag').value = DEFAULT_OPTIONS.defaultTag;
+          el('notificationEnabled').checked = DEFAULT_OPTIONS.notificationEnabled;
+          save();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+          load();
+          el('save').addEventListener('click', save);
+          el('reset').addEventListener('click', resetDefaults);
+        });
+      </script>
+    </body>
+  </html>

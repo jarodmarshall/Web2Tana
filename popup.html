@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Copy as Tana Paste</title>
+    <style>body{font-family:Arial,sans-serif;padding:12px;min-width:220px}button{padding:8px 12px}</style>
+  </head>
+  <body>
+    <h3>Copy as Tana Paste</h3>
+    <p>Use the context menu or the keyboard shortcut to copy content in Tana Paste format.</p>
+    <div style="margin-top:12px">
+      <button id="openOptions">Open Options</button>
+    </div>
+
+    <script>
+      document.getElementById('openOptions').addEventListener('click', () => {
+        if (chrome && chrome.runtime && chrome.runtime.openOptionsPage) chrome.runtime.openOptionsPage();
+      });
+    </script>
+  </body>
+</html>

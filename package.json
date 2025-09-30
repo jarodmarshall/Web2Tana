@@ -1,0 +1,19 @@
+{
+  "name": "tana-paste-extension",
+  "version": "1.0.0",
+  "description": "",
+  "main": ".tmp_options_script.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "jsdom": "^21.1.2"
+  }
+}
